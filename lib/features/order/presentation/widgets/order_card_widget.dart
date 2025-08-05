@@ -5,7 +5,7 @@ import 'package:jerseyhub/features/order/domain/entity/order_entity.dart';
 import 'package:jerseyhub/features/order/presentation/view/order_detail_view.dart';
 import 'package:jerseyhub/features/order/presentation/viewmodel/order_viewmodel.dart';
 
-class OrderCardWidget extends StatelessWidget {
+class OrderCardWidget extends StatefulWidget {
   final OrderEntity order;
   final OrderViewModel orderViewModel;
 
@@ -16,7 +16,17 @@ class OrderCardWidget extends StatelessWidget {
   });
 
   @override
+  State<OrderCardWidget> createState() => _OrderCardWidgetState();
+}
+
+class _OrderCardWidgetState extends State<OrderCardWidget> {
+  @override
   Widget build(BuildContext context) {
+    print(
+      '🛒 OrderCardWidget: Building order card for order ID: ${widget.order.id}',
+    );
+    print('🛒 OrderCardWidget: Order has ${widget.order.items.length} items');
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -27,7 +37,7 @@ class OrderCardWidget extends StatelessWidget {
             MaterialPageRoute(
               builder: (context) => BlocProvider(
                 create: (context) => serviceLocator<OrderViewModel>(),
-                child: OrderDetailView(orderId: order.id),
+                child: OrderDetailView(orderId: widget.order.id),
               ),
             ),
           );
@@ -42,15 +52,17 @@ class OrderCardWidget extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Order #${order.id.substring(0, 8)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    'Order #${widget.order.id.length > 8 ? widget.order.id.substring(widget.order.id.length - 8) : widget.order.id}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Colors.grey[600],
                     ),
                   ),
                   Row(
                     children: [
-                      _buildStatusChip(order.status),
+                      _buildStatusChip(widget.order.status),
                       const SizedBox(width: 8),
                       _buildDeleteButton(context),
                     ],
@@ -63,7 +75,7 @@ class OrderCardWidget extends StatelessWidget {
                   Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
-                    _formatDate(order.createdAt),
+                    _formatDate(widget.order.createdAt),
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -74,7 +86,7 @@ class OrderCardWidget extends StatelessWidget {
                   Icon(Icons.shopping_bag, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
-                    '${order.itemCount} items',
+                    '${widget.order.itemCount} items',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -92,7 +104,7 @@ class OrderCardWidget extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'रू${order.totalAmount.toStringAsFixed(2)}',
+                    'रू${widget.order.totalAmount.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -194,7 +206,7 @@ class OrderCardWidget extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Are you sure you want to delete order #${order.id.substring(0, 8)}? This action cannot be undone.',
+            'Are you sure you want to delete order #${widget.order.id.length > 8 ? widget.order.id.substring(0, 8) : widget.order.id}? This action cannot be undone.',
           ),
           actions: [
             TextButton(
@@ -219,17 +231,19 @@ class OrderCardWidget extends StatelessWidget {
   }
 
   void _deleteOrder(BuildContext context) {
-    orderViewModel.add(DeleteOrderEvent(orderId: order.id));
+    widget.orderViewModel.add(DeleteOrderEvent(orderId: widget.order.id));
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Order #${order.id.substring(0, 8)} deleted successfully',
+    // Show success message only if widget is still mounted
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order #${widget.order.id.length > 8 ? widget.order.id.substring(0, 8) : widget.order.id} deleted successfully',
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    }
   }
 }

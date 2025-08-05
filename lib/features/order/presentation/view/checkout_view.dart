@@ -8,6 +8,9 @@ import 'package:jerseyhub/features/order/presentation/viewmodel/order_viewmodel.
 import 'package:jerseyhub/features/order/presentation/widgets/order_item_widget.dart';
 import 'package:jerseyhub/features/payment/presentation/view/payment_view.dart';
 import 'package:jerseyhub/features/payment/presentation/viewmodel/payment_viewmodel.dart';
+import 'package:jerseyhub/features/cart/presentation/viewmodel/cart_viewmodel.dart';
+import 'package:jerseyhub/features/home/presentation/view/home_page.dart';
+import 'package:jerseyhub/features/order/presentation/view/order_list_view.dart';
 
 class CheckoutView extends StatefulWidget {
   final CartEntity cart;
@@ -52,9 +55,11 @@ class _CheckoutViewState extends State<CheckoutView> {
       ),
       body: BlocListener<OrderViewModel, OrderState>(
         listener: (context, state) {
-          if (state is OrderCreated) {
+          if (state is OrderCreated && mounted) {
+            print('✅ Order created successfully: ${state.order.id}');
             _showOrderSuccessDialog(state.order);
-          } else if (state is OrderError) {
+          } else if (state is OrderError && mounted) {
+            print('❌ Order creation failed: ${state.message}');
             _showErrorSnackBar(state.message);
           }
         },
@@ -272,9 +277,20 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 
   void _proceedToPayment() {
+    print('🛒 CheckoutView: Proceed to Payment button pressed');
+    print(
+      '🛒 CheckoutView: Form validation: ${_formKey.currentState?.validate()}',
+    );
+
     if (_formKey.currentState!.validate()) {
       final orderId = DateTime.now().millisecondsSinceEpoch.toString();
       final totalAmount = widget.cart.totalPrice + 5.99;
+
+      print('🛒 CheckoutView: Order ID: $orderId');
+      print('🛒 CheckoutView: Total Amount: $totalAmount');
+      print('🛒 CheckoutView: Customer Name: ${_nameController.text}');
+      print('🛒 CheckoutView: Customer Email: ${_emailController.text}');
+      print('🛒 CheckoutView: Navigating to PaymentView...');
 
       // Navigate to payment page
       Navigator.push(
@@ -293,10 +309,14 @@ class _CheckoutViewState extends State<CheckoutView> {
               customerEmail: _emailController.text,
               onPaymentSuccess: () {
                 // This will be called when payment is successful
-                _placeOrder(orderId);
+                if (mounted) {
+                  _placeOrder(orderId);
+                }
               },
               onPaymentFailure: () {
-                _showErrorSnackBar('Payment failed. Please try again.');
+                if (mounted) {
+                  _showErrorSnackBar('Payment failed. Please try again.');
+                }
               },
             ),
           ),
@@ -304,7 +324,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       ).then((result) {
         // When payment screen is popped, check if payment was successful
         // For eSewa, we assume success if the screen is popped normally
-        if (result == true) {
+        if (result == true && mounted) {
           _placeOrder(orderId);
         }
       });
@@ -312,6 +332,8 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 
   void _placeOrder(String orderId) {
+    if (!mounted) return; // Don't proceed if widget is unmounted
+
     final userId = _userSharedPrefs.getCurrentUserId();
 
     final order = OrderEntity(
@@ -331,6 +353,11 @@ class _CheckoutViewState extends State<CheckoutView> {
     );
 
     print('🔗 Creating order with userId: $userId');
+    print(
+      '🔗 Order details: ID=${order.id}, Total=${order.totalAmount}, Items=${order.items.length}',
+    );
+    print('🔗 Customer: ${order.customerName} (${order.customerEmail})');
+
     context.read<OrderViewModel>().add(CreateOrderEvent(order: order));
   }
 
@@ -355,12 +382,16 @@ class _CheckoutViewState extends State<CheckoutView> {
             ],
           ),
           actions: [
-            TextButton(
+            ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.of(context).pop(); // Close dialog
+                _clearCartAndNavigateToOrders();
               },
-              child: const Text('Continue Shopping'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Go to Orders'),
             ),
           ],
         );
@@ -368,19 +399,81 @@ class _CheckoutViewState extends State<CheckoutView> {
     );
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        action: SnackBarAction(
-          label: 'Dismiss',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
+  void _clearCartAndNavigateToOrders() {
+    // Clear the cart
+    final userId = _userSharedPrefs.getCurrentUserId();
+    if (userId != null) {
+      final cartViewModel = serviceLocator<CartViewModel>();
+      cartViewModel.add(PaymentCompletedEvent());
+    }
+
+    // Show success message before navigation
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Order placed successfully! Cart cleared. Navigating to orders.',
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
         ),
-      ),
-    );
+      );
+    }
+
+    // Navigate to orders page after showing snackbar
+    if (mounted) {
+      // First pop to home
+      Navigator.of(context).popUntil((route) => route.isFirst);
+
+      // Add a small delay to ensure navigation completes
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          // Create a fresh OrderViewModel and navigate to orders page
+          final orderViewModel = serviceLocator<OrderViewModel>();
+
+          // Navigate to the orders page
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute(
+                  builder: (context) => BlocProvider.value(
+                    value: orderViewModel,
+                    child: OrderListView(
+                      onShopNowPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                ),
+              )
+              .then((_) {
+                // After navigation, trigger a refresh of orders
+                if (mounted) {
+                  print('🔄 Triggering order refresh after navigation');
+                  orderViewModel.add(const LoadAllOrdersEvent());
+                }
+              });
+        }
+      });
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'Dismiss',
+            textColor: Colors.white,
+            onPressed: () {
+              if (mounted) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              }
+            },
+          ),
+        ),
+      );
+    }
   }
 }

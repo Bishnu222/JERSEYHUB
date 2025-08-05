@@ -20,18 +20,46 @@ class _NotificationListViewState extends State<NotificationListView> {
     super.initState();
     _userSharedPrefs = serviceLocator<UserSharedPrefs>();
     _loadNotifications();
+    _refreshNotificationsOnOpen();
+  }
+
+  void _refreshNotificationsOnOpen() {
+    final userId = _userSharedPrefs.getCurrentUserId();
+    if (userId != null && userId.isNotEmpty) {
+      print(
+        '🔍 NotificationListView: Refreshing notifications on page open for user: $userId',
+      );
+      // Add a small delay to ensure the bloc is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          context.read<NotificationBloc>().add(RefreshNotifications(userId));
+        }
+      });
+    }
   }
 
   void _loadNotifications() {
     final userId = _userSharedPrefs.getCurrentUserId();
     print('🔍 NotificationListView: Current user ID: $userId');
 
-    if (userId != null) {
+    if (userId != null && userId.isNotEmpty) {
       print('🔍 NotificationListView: Loading notifications for user: $userId');
-      context.read<NotificationBloc>().add(LoadNotifications(userId));
-      context.read<NotificationBloc>().add(ConnectToSocket(userId));
+      try {
+        context.read<NotificationBloc>().add(LoadNotifications(userId));
+        context.read<NotificationBloc>().add(ConnectToSocket(userId));
+        print('🔍 NotificationListView: Events dispatched successfully');
+      } catch (e) {
+        print('❌ NotificationListView: Error dispatching events: $e');
+      }
     } else {
-      print('❌ NotificationListView: No user ID found!');
+      print('❌ NotificationListView: No valid user ID found!');
+      // Show a user-friendly message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to view notifications'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -197,7 +225,9 @@ class _NotificationListViewState extends State<NotificationListView> {
                       'No notifications yet',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Colors.grey.shade600,
+                        color:
+                            Theme.of(context).textTheme.bodyLarge?.color ??
+                            Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -205,7 +235,9 @@ class _NotificationListViewState extends State<NotificationListView> {
                       'You\'ll see notifications here when they arrive',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade500,
+                        color:
+                            Theme.of(context).textTheme.bodyMedium?.color ??
+                            Colors.grey.shade500,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -244,7 +276,16 @@ class _NotificationListViewState extends State<NotificationListView> {
             );
           }
 
-          return const Center(child: Text('No notifications'));
+          return Center(
+            child: Text(
+              'No notifications',
+              style: TextStyle(
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.white,
+              ),
+            ),
+          );
         },
       ),
     );

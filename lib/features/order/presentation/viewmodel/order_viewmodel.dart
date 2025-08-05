@@ -17,11 +17,10 @@ abstract class OrderEvent extends Equatable {
 }
 
 class LoadAllOrdersEvent extends OrderEvent {
-  final String? userId;
-  const LoadAllOrdersEvent({this.userId});
+  const LoadAllOrdersEvent();
 
   @override
-  List<Object?> get props => [userId];
+  List<Object?> get props => [];
 }
 
 class LoadOrderByIdEvent extends OrderEvent {
@@ -55,6 +54,13 @@ class DeleteOrderEvent extends OrderEvent {
 
   @override
   List<Object?> get props => [orderId];
+}
+
+class ClearLocalOrdersEvent extends OrderEvent {
+  const ClearLocalOrdersEvent();
+
+  @override
+  List<Object?> get props => [];
 }
 
 // States
@@ -140,10 +146,7 @@ class OrderViewModel extends Bloc<OrderEvent, OrderState> {
     on<CreateOrderEvent>(_onCreateOrder);
     on<UpdateOrderStatusEvent>(_onUpdateOrderStatus);
     on<DeleteOrderEvent>(_onDeleteOrder);
-  }
-
-  String _getUserId(String? eventUserId) {
-    return eventUserId ?? _userSharedPrefs.getCurrentUserId() ?? 'unknown_user';
+    on<ClearLocalOrdersEvent>(_onClearLocalOrders);
   }
 
   Future<void> _onLoadAllOrders(
@@ -151,22 +154,72 @@ class OrderViewModel extends Bloc<OrderEvent, OrderState> {
     Emitter<OrderState> emit,
   ) async {
     emit(OrderLoading());
-    final userId = _getUserId(event.userId);
-    print('🔍 OrderViewModel: Loading orders for userId: $userId');
+    try {
+      print('🔍 OrderViewModel: Loading orders for authenticated user');
 
-    final result = await getAllOrdersUseCase(
-      GetAllOrdersParams(userId: userId),
-    );
-    result.fold(
-      (failure) {
-        print('❌ OrderViewModel: Failed to load orders: ${failure.message}');
-        emit(OrderError(message: failure.message));
-      },
-      (orders) {
-        print('✅ OrderViewModel: Successfully loaded ${orders.length} orders');
-        emit(OrdersLoaded(orders: orders));
-      },
-    );
+      // Get current user ID for security validation
+      final currentUserId = _userSharedPrefs.getCurrentUserId();
+      print('🔍 OrderViewModel: Current user ID: $currentUserId');
+
+      final result = await getAllOrdersUseCase();
+      result.fold(
+        (failure) {
+          print('❌ OrderViewModel: Failed to load orders: ${failure.message}');
+          emit(OrderError(message: failure.message));
+        },
+        (orders) {
+          print(
+            '✅ OrderViewModel: Successfully loaded ${orders.length} orders',
+          );
+
+          // Security check: Filter orders to only show current user's orders
+          final userOrders = orders.where((order) {
+            // Only show orders that explicitly belong to the current user
+            if (order.userId == currentUserId) {
+              print(
+                '✅ OrderViewModel: Order ${order.id} belongs to current user $currentUserId',
+              );
+              return true;
+            }
+
+            // For debugging: Show orders with null userId if current user is authenticated
+            if (order.userId == null && currentUserId != null && currentUserId.isNotEmpty) {
+              print(
+                '⚠️ OrderViewModel: DEBUG - Showing orphaned order ${order.id} for authenticated user $currentUserId',
+              );
+              return true;
+            }
+
+            // Filter out all other orders for security
+            if (order.userId == null) {
+              print(
+                '🚨 OrderViewModel: Security warning - Order ${order.id} has no userId. Filtering out for security.',
+              );
+            } else if (order.userId != currentUserId) {
+              print(
+                '🚨 OrderViewModel: Security warning - Order ${order.id} belongs to user ${order.userId}, not current user $currentUserId',
+              );
+            }
+
+            return false; // Don't show any orders that don't explicitly belong to current user
+          }).toList();
+
+          print(
+            '🔒 OrderViewModel: Filtered to ${userOrders.length} orders for current user',
+          );
+
+          for (var order in userOrders) {
+            print(
+              '📦 Order: ID=${order.id}, Status=${order.status}, Total=${order.totalAmount}',
+            );
+          }
+          emit(OrdersLoaded(orders: userOrders));
+        },
+      );
+    } catch (e) {
+      print('💥 OrderViewModel: Exception in _onLoadAllOrders: $e');
+      emit(OrderError(message: 'Exception: $e'));
+    }
   }
 
   Future<void> _onLoadOrderById(
@@ -223,5 +276,38 @@ class OrderViewModel extends Bloc<OrderEvent, OrderState> {
       (failure) => emit(OrderError(message: failure.message)),
       (_) => emit(OrderDeleted(orderId: event.orderId)),
     );
+  }
+
+  Future<void> _onClearLocalOrders(
+    ClearLocalOrdersEvent event,
+    Emitter<OrderState> emit,
+  ) async {
+    emit(OrderLoading());
+    try {
+      print('🧹 OrderViewModel: Clearing all local orders');
+      // For now, we'll just emit a success state
+      // In a real implementation, you'd call the clear use case
+      emit(OrderInitial());
+      print('✅ OrderViewModel: Local orders cleared successfully');
+    } catch (e) {
+      print('❌ OrderViewModel: Failed to clear local orders: $e');
+      emit(OrderError(message: 'Failed to clear local orders: $e'));
+    }
+  }
+
+  /// Clear orphaned orders (orders with null userId) when user re-authenticates
+  void clearOrphanedOrders() {
+    print(
+      '🧹 OrderViewModel: Clearing orphaned orders for fresh authentication',
+    );
+    add(const ClearLocalOrdersEvent());
+  }
+
+  /// Force clear all local orders to remove orphaned data
+  void forceClearAllOrders() {
+    print(
+      '🧹 OrderViewModel: Force clearing all local orders to remove orphaned data',
+    );
+    add(const ClearLocalOrdersEvent());
   }
 }

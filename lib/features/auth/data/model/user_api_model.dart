@@ -14,7 +14,7 @@ class UserApiModel extends Equatable {
     includeFromJson: false,
     includeToJson: true,
   ) // Include password in toJson (for registration) but exclude from fromJson (for login responses)
-  final String password;
+  final String? password;
   final String address;
   @JsonKey(
     includeFromJson: false,
@@ -51,7 +51,7 @@ class UserApiModel extends Equatable {
     this.id,
     required this.email,
     required this.username,
-    this.password = '', // Default empty string since it's excluded from JSON
+    this.password, // Make it nullable
     required this.address,
     this.phoneNumber,
     this.profileImage,
@@ -74,7 +74,7 @@ class UserApiModel extends Equatable {
       id: id,
       email: email,
       username: username,
-      password: password,
+      password: password ?? '', // Handle nullable password
       address: address,
     );
   }

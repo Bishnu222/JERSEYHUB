@@ -114,7 +114,7 @@ class _ProductListViewState extends State<ProductListView> {
                 return const Center(child: CircularProgressIndicator());
               } else if (state is ProductsLoaded) {
                 if (state.products.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -122,7 +122,12 @@ class _ProductListViewState extends State<ProductListView> {
                         SizedBox(height: 16),
                         Text(
                           'No products found',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                          style: TextStyle(
+                            fontSize: 18,
+                            color:
+                                Theme.of(context).textTheme.bodyLarge?.color ??
+                                Colors.grey,
+                          ),
                         ),
                       ],
                     ),
@@ -134,18 +139,19 @@ class _ProductListViewState extends State<ProductListView> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 16),
+                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      SizedBox(height: 16),
                       Text(
                         'Error: ${state.message}',
-                        style: const TextStyle(fontSize: 16, color: Colors.red),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              Theme.of(context).textTheme.bodyLarge?.color ??
+                              Colors.red,
+                        ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
                           context.read<ProductViewModel>().add(
@@ -158,7 +164,17 @@ class _ProductListViewState extends State<ProductListView> {
                   ),
                 );
               }
-              return const Center(child: Text('No products available'));
+              return Center(
+                child: Text(
+                  'No products available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color:
+                        Theme.of(context).textTheme.bodyLarge?.color ??
+                        Colors.grey,
+                  ),
+                ),
+              );
             },
           ),
         ),
@@ -190,18 +206,27 @@ class _ProductListViewState extends State<ProductListView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.sports_soccer, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
+            Icon(Icons.sports_soccer, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 18,
+                color:
+                    Theme.of(context).textTheme.bodyLarge?.color ?? Colors.grey,
+              ),
               textAlign: TextAlign.center,
             ),
             if (_selectedCategory == null) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Currently supporting: Barcelona, Manchester United, Real Madrid, Liverpool',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              SizedBox(height: 8),
+              Text(
+                'Try adjusting your search or filters',
+                style: TextStyle(
+                  fontSize: 14,
+                  color:
+                      Theme.of(context).textTheme.bodyMedium?.color ??
+                      Colors.grey,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

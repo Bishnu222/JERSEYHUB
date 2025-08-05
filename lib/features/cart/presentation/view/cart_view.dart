@@ -8,7 +8,10 @@ import 'package:jerseyhub/app/service_locator/service_locator.dart';
 import 'package:jerseyhub/features/cart/domain/entity/cart_entity.dart';
 
 class CartView extends StatefulWidget {
-  const CartView({super.key});
+  final VoidCallback? onShopNowPressed;
+  final bool? isPaymentCompleted; // Add parameter to track payment completion
+
+  const CartView({super.key, this.onShopNowPressed, this.isPaymentCompleted});
 
   @override
   State<CartView> createState() => _CartViewState();
@@ -36,11 +39,11 @@ class _CartViewState extends State<CartView> {
           print(
             '🛒 CartView: Cart updated with ${state.cart.items.length} items',
           );
-          state.cart.items.forEach((item) {
+          for (var item in state.cart.items) {
             print(
               '🛒 CartView: Item - ${item.product.team} (${item.selectedSize}) - रू${item.product.price}',
             );
-          });
+          }
         }
       },
       child: Scaffold(
@@ -98,8 +101,11 @@ class _CartViewState extends State<CartView> {
                   if (state is CartLoading) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (state is CartLoaded) {
+                    print(
+                      '🛒 CartView: Received CartLoaded state. Cart empty: ${state.cart.isEmpty}, paymentCompleted: ${state.paymentCompleted}',
+                    );
                     if (state.cart.isEmpty) {
-                      return _buildEmptyCart();
+                      return _buildEmptyCart(state.paymentCompleted);
                     }
                     return _buildCartContent(state.cart);
                   } else if (state is CartError) {
@@ -115,47 +121,86 @@ class _CartViewState extends State<CartView> {
     );
   }
 
-  Widget _buildEmptyCart() {
+  Widget _buildEmptyCart(bool isAfterPayment) {
+    print(
+      '🛒 CartView: _buildEmptyCart called with isAfterPayment: $isAfterPayment',
+    );
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Debug indicator - remove this later
+          Container(
+            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: isAfterPayment ? Colors.green[100] : Colors.orange[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isAfterPayment ? Colors.green : Colors.orange,
+                width: 2,
+              ),
+            ),
+            child: Text(
+              'DEBUG: isAfterPayment = $isAfterPayment',
+              style: TextStyle(
+                color: isAfterPayment ? Colors.green[800] : Colors.orange[800],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Icon(
-            Icons.shopping_cart_outlined,
+            isAfterPayment
+                ? Icons.check_circle_outline
+                : Icons.shopping_cart_outlined,
             size: 100,
-            color: Colors.grey[400],
+            color: isAfterPayment ? Colors.green[400] : Colors.grey[400],
           ),
           const SizedBox(height: 16),
           Text(
-            'Your cart is empty',
+            isAfterPayment
+                ? 'Order Placed Successfully!'
+                : 'Your cart is empty',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: isAfterPayment ? Colors.green[600] : Colors.grey[600],
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add some jerseys to get started!',
-            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            isAfterPayment
+                ? 'Your order has been placed and your cart has been cleared. You can track your order in the Orders section.'
+                : 'Add some jerseys to get started!',
+            style: TextStyle(
+              fontSize: 16,
+              color: isAfterPayment ? Colors.green[500] : Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
-              // Navigate back to products
-              Navigator.pop(context);
+              // Use callback if provided, otherwise fallback to pop
+              if (widget.onShopNowPressed != null) {
+                widget.onShopNowPressed!();
+              } else {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
+              backgroundColor: isAfterPayment
+                  ? Colors.green
+                  : Theme.of(context).primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              'Browse Jerseys',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            child: Text(
+              isAfterPayment ? 'Continue Shopping' : 'Shop Now',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -260,6 +305,9 @@ class _CartViewState extends State<CartView> {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
+                  print('🛒 CartView: Proceed to Checkout button pressed');
+                  print('🛒 CartView: Cart has ${cart.items.length} items');
+                  print('🛒 CartView: Navigating to CheckoutView...');
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -298,7 +346,10 @@ class _CartViewState extends State<CartView> {
           const SizedBox(height: 16),
           Text(
             'Error: $message',
-            style: const TextStyle(fontSize: 16, color: Colors.red),
+            style: TextStyle(
+              fontSize: 16,
+              color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.red,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),

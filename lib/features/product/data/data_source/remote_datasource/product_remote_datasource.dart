@@ -14,51 +14,71 @@ class ProductRemoteDataSource implements IProductDataSource {
   @override
   Future<List<ProductEntity>> getAllProducts() async {
     try {
-      // For testing purposes, always use mock data
-      print('Using mock products for testing');
-      return _getMockProducts();
-
-      // Uncomment the following code when you want to use real API
-      /*
-      final response = await _apiService.dio.get(
-        BackendConfig.productsEndpoint,
-      );
-
-      if (BackendConfig.successStatusCodes.contains(response.statusCode)) {
-        final responseData = response.data;
-
-        // Handle different response formats
-        List<dynamic> productsData;
-        if (responseData is Map<String, dynamic>) {
-          if (responseData['success'] == true && responseData['data'] != null) {
-            productsData = responseData['data'] as List<dynamic>;
-          } else if (responseData['products'] != null) {
-            productsData = responseData['products'] as List<dynamic>;
-          } else {
-            productsData = [responseData]; // Single product
-          }
-        } else if (responseData is List) {
-          productsData = responseData;
-        } else {
-          throw Exception("Invalid response format");
-        }
-
-        return productsData
-            .map((json) => ProductApiModel.fromJson(json).toEntity())
-            .toList();
-      } else {
-        throw Exception("Failed to fetch products: ${response.statusMessage}");
-      }
-      */
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout) {
-        // For testing purposes, simulate successful products fetch when backend is not available
+      // Use real API when backend is enabled
+      if (BackendConfig.enableBackend) {
         print(
-          'Backend not available, simulating successful products fetch for testing',
+          '🔄 Fetching products from backend: ${BackendConfig.productsEndpoint}',
         );
+        final response = await _apiService.dio.get(
+          BackendConfig.productsEndpoint,
+        );
+
+        if (BackendConfig.successStatusCodes.contains(response.statusCode)) {
+          final responseData = response.data;
+
+          // Handle different response formats
+          List<dynamic> productsData;
+          if (responseData is Map<String, dynamic>) {
+            if (responseData['success'] == true &&
+                responseData['data'] != null) {
+              productsData = responseData['data'] as List<dynamic>;
+            } else if (responseData['products'] != null) {
+              productsData = responseData['products'] as List<dynamic>;
+            } else {
+              productsData = [responseData]; // Single product
+            }
+          } else if (responseData is List) {
+            productsData = responseData;
+          } else {
+            throw Exception("Invalid response format");
+          }
+
+          final products = productsData
+              .map((json) => ProductApiModel.fromJson(json).toEntity())
+              .toList();
+          print(
+            '✅ Successfully fetched ${products.length} products from backend',
+          );
+
+          // Debug: Print detailed product info for first few products
+          for (int i = 0; i < products.length && i < 5; i++) {
+            print('🖼️ Product ${i + 1}:');
+            print('   Team: ${products[i].team}');
+            print('   Type: ${products[i].type}');
+            print('   Size: ${products[i].size}');
+            print('   Image URL: ${products[i].productImage}');
+            print('   ---');
+          }
+
+          return products;
+        } else {
+          throw Exception(
+            "Failed to fetch products: ${response.statusMessage}",
+          );
+        }
+      } else {
+        // Fallback to mock data when backend is disabled
+        print('📱 Backend disabled, using mock products');
+        return _getMockProducts();
+      }
+    } on DioException catch (e) {
+      print('❌ Backend connection error: ${e.message}');
+      if (e.type == DioExceptionType.connectionTimeout) {
+        print('⏰ Connection timeout, falling back to mock products');
         return _getMockProducts();
       } else {
-        throw Exception('Failed to get products: ${e.message}');
+        print('🔄 Other connection error, falling back to mock products');
+        return _getMockProducts();
       }
     } catch (e) {
       throw Exception('Failed to get products: $e');
@@ -97,15 +117,17 @@ class ProductRemoteDataSource implements IProductDataSource {
         );
       }
     } on DioException catch (e) {
+      print('❌ Backend category error: ${e.message}');
       if (e.type == DioExceptionType.connectionTimeout) {
-        print(
-          'Backend not available, simulating products by category for testing',
-        );
+        print('⏰ Category timeout, falling back to mock products');
         return _getMockProducts()
             .where((product) => product.categoryId == categoryId)
             .toList();
       } else {
-        throw Exception('Failed to get products by category: ${e.message}');
+        print('🔄 Other category error, falling back to mock products');
+        return _getMockProducts()
+            .where((product) => product.categoryId == categoryId)
+            .toList();
       }
     } catch (e) {
       throw Exception('Failed to get products by category: $e');
@@ -138,8 +160,9 @@ class ProductRemoteDataSource implements IProductDataSource {
         throw Exception("Failed to fetch product: ${response.statusMessage}");
       }
     } on DioException catch (e) {
+      print('❌ Backend product by ID error: ${e.message}');
       if (e.type == DioExceptionType.connectionTimeout) {
-        print('Backend not available, simulating product by ID for testing');
+        print('⏰ Product by ID timeout, falling back to mock products');
         final mockProducts = _getMockProducts();
         final product = mockProducts.firstWhere(
           (product) => product.id == id,
@@ -147,7 +170,13 @@ class ProductRemoteDataSource implements IProductDataSource {
         );
         return product;
       } else {
-        throw Exception('Failed to get product: ${e.message}');
+        print('🔄 Other product by ID error, falling back to mock products');
+        final mockProducts = _getMockProducts();
+        final product = mockProducts.firstWhere(
+          (product) => product.id == id,
+          orElse: () => throw Exception('Product not found'),
+        );
+        return product;
       }
     } catch (e) {
       throw Exception('Failed to get product: $e');
@@ -157,48 +186,55 @@ class ProductRemoteDataSource implements IProductDataSource {
   @override
   Future<List<ProductEntity>> searchProducts(String query) async {
     try {
-      // For testing purposes, always use mock data
-      print('Using mock products for search testing');
-      final mockProducts = _getMockProducts();
-      return mockProducts
-          .where(
-            (product) =>
-                product.team.toLowerCase().contains(query.toLowerCase()),
-          )
-          .toList();
+      // Use real API when backend is enabled
+      if (BackendConfig.enableBackend) {
+        print('🔍 Searching products from backend: $query');
+        final response = await _apiService.dio.get(
+          '${BackendConfig.productsEndpoint}/search?q=$query',
+        );
 
-      // Uncomment the following code when you want to use real API
-      /*
-      final response = await _apiService.dio.get(
-        '${BackendConfig.productsEndpoint}/search?q=$query',
-      );
+        if (BackendConfig.successStatusCodes.contains(response.statusCode)) {
+          final responseData = response.data;
+          List<dynamic> productsData;
 
-      if (BackendConfig.successStatusCodes.contains(response.statusCode)) {
-        final responseData = response.data;
-        List<dynamic> productsData;
-
-        if (responseData is Map<String, dynamic>) {
-          if (responseData['success'] == true && responseData['data'] != null) {
-            productsData = responseData['data'] as List<dynamic>;
+          if (responseData is Map<String, dynamic>) {
+            if (responseData['success'] == true &&
+                responseData['data'] != null) {
+              productsData = responseData['data'] as List<dynamic>;
+            } else {
+              productsData = [responseData];
+            }
+          } else if (responseData is List) {
+            productsData = responseData;
           } else {
-            productsData = [responseData];
+            throw Exception("Invalid response format");
           }
-        } else if (responseData is List) {
-          productsData = responseData;
-        } else {
-          throw Exception("Invalid response format");
-        }
 
-        return productsData
-            .map((json) => ProductApiModel.fromJson(json).toEntity())
-            .toList();
+          final products = productsData
+              .map((json) => ProductApiModel.fromJson(json).toEntity())
+              .toList();
+          print('✅ Found ${products.length} products for query: $query');
+          return products;
+        } else {
+          throw Exception(
+            "Failed to search products: ${response.statusMessage}",
+          );
+        }
       } else {
-        throw Exception("Failed to search products: ${response.statusMessage}");
+        // Fallback to mock data when backend is disabled
+        print('📱 Backend disabled, searching mock products for: $query');
+        final mockProducts = _getMockProducts();
+        return mockProducts
+            .where(
+              (product) =>
+                  product.team.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
       }
-      */
     } on DioException catch (e) {
+      print('❌ Backend search error: ${e.message}');
       if (e.type == DioExceptionType.connectionTimeout) {
-        print('Backend not available, simulating product search for testing');
+        print('⏰ Search timeout, falling back to mock products');
         final mockProducts = _getMockProducts();
         return mockProducts
             .where(
@@ -207,7 +243,14 @@ class ProductRemoteDataSource implements IProductDataSource {
             )
             .toList();
       } else {
-        throw Exception('Failed to search products: ${e.message}');
+        print('🔄 Other search error, falling back to mock products');
+        final mockProducts = _getMockProducts();
+        return mockProducts
+            .where(
+              (product) =>
+                  product.team.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
       }
     } catch (e) {
       throw Exception('Failed to search products: $e');
@@ -378,7 +421,7 @@ class ProductRemoteDataSource implements IProductDataSource {
         price: 2500.0,
         quantity: 25,
         categoryId: '2',
-        productImage: 'assets/images/Manchester United.png',
+        productImage: 'assets/images/Manchester_United.png',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
@@ -429,7 +472,7 @@ class ProductRemoteDataSource implements IProductDataSource {
         price: 2500.0,
         quantity: 50,
         categoryId: '3',
-        productImage: 'assets/images/Real Madrid.png',
+        productImage: 'assets/images/Real_Madrid.png',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),

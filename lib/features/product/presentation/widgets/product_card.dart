@@ -221,8 +221,13 @@ class ProductCard extends StatelessWidget {
           fit: BoxFit.contain,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (context, error, stackTrace) =>
-              _buildPlaceholderImage(),
+          errorBuilder: (context, error, stackTrace) {
+            print(
+              '❌ Asset image load error for ${product.productImage}: $error',
+            );
+            // Try to use a different asset image as fallback
+            return _buildAssetFallbackImage();
+          },
         ),
       );
     } else if (product.productImage.isNotEmpty) {
@@ -235,8 +240,15 @@ class ProductCard extends StatelessWidget {
           fit: BoxFit.contain,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (context, error, stackTrace) =>
-              _buildPlaceholderImage(),
+          cacheWidth: null, // Disable caching
+          cacheHeight: null, // Disable caching
+          key: ValueKey(
+            '${product.id}-${product.productImage}-${DateTime.now().millisecondsSinceEpoch}',
+          ), // Force rebuild with timestamp
+          errorBuilder: (context, error, stackTrace) {
+            print('❌ Image load error for ${product.productImage}: $error');
+            return _buildPlaceholderImage();
+          },
         ),
       );
     } else {
@@ -251,6 +263,42 @@ class ProductCard extends StatelessWidget {
       color: Colors.grey[300],
       child: const Center(
         child: Icon(Icons.sports_soccer, size: 48, color: Colors.grey),
+      ),
+    );
+  }
+
+  Widget _buildAssetFallbackImage() {
+    // List of all available asset images
+    List<String> fallbackImages = [
+      'assets/images/Real_Madrid.png',
+      'assets/images/Real_Madrid_Away_2019-20.png',
+      'assets/images/Liverpool.png',
+      'assets/images/Liverpool_FC_Home_Jersey.webp',
+      'assets/images/Barcelona.png',
+      'assets/images/Barcelona_Away_jersey.png',
+      'assets/images/Manchester_United.png',
+      'assets/images/Manchester_United_FC_Jersey.png',
+    ];
+
+    // Use product ID to consistently select a fallback image
+    int index = product.id.hashCode.abs() % fallbackImages.length;
+    String fallbackImage = fallbackImages[index];
+
+    print('🔄 Using fallback asset image: $fallbackImage');
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.grey[200],
+      child: Image.asset(
+        fallbackImage,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Fallback asset image also failed: $fallbackImage - $error');
+          return _buildPlaceholderImage();
+        },
       ),
     );
   }

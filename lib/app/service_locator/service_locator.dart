@@ -72,6 +72,11 @@ import '../../features/notification/domain/use_case/mark_all_notifications_read_
 import '../../features/notification/domain/use_case/clear_all_notifications_usecase.dart';
 import '../../features/notification/presentation/bloc/notification_bloc.dart';
 import '../../features/cart/data/services/cart_notification_service.dart';
+import '../../app/services/sensor_service.dart';
+import '../../app/services/theme_service.dart';
+import 'package:jerseyhub/main.dart';
+import '../../features/notification/data/data_source/notification_local_datasource.dart';
+import '../../features/notification/domain/use_case/add_notification_usecase.dart';
 
 final serviceLocator = GetIt.instance;
 
@@ -88,12 +93,15 @@ Future<void> initDependencies() async {
   await _initPaymentModule();
   await _initProfileModule();
   await _initNotificationModule();
+  await _initSensorAndThemeServices();
 }
 
 Future<void> _initProfileModule() async {
+  // Data layer - Use real backend data source
   serviceLocator.registerLazySingleton<ProfileRemoteDataSource>(
     () => ProfileRemoteDataSourceImpl(serviceLocator<ApiService>()),
   );
+
   serviceLocator.registerLazySingleton<ProfileRepository>(
     () => ProfileRepositoryImpl(serviceLocator<ProfileRemoteDataSource>()),
   );
@@ -231,7 +239,7 @@ Future<void> _initHomeModule() async {
 }
 
 Future<void> _initProductModule() async {
-  // Data layer
+  // Data layer - ProductRemoteDataSource already has mock fallback
   serviceLocator.registerLazySingleton<ProductRemoteDataSource>(
     () => ProductRemoteDataSource(apiService: serviceLocator<ApiService>()),
   );
@@ -277,7 +285,7 @@ Future<void> _initProductModule() async {
 }
 
 Future<void> _initCategoryModule() async {
-  // Data layer
+  // Data layer - CategoryRemoteDataSource already has mock fallback
   serviceLocator.registerLazySingleton<CategoryRemoteDataSource>(
     () => CategoryRemoteDataSource(apiService: serviceLocator<ApiService>()),
   );
@@ -316,6 +324,7 @@ Future<void> _initCartModule() async {
     () => CartLocalDataSourceImpl(),
   );
 
+  // Cart remote data source - already has mock fallback
   serviceLocator.registerLazySingleton<CartRemoteDataSource>(
     () => CartRemoteDataSourceImpl(serviceLocator<ApiService>().dio),
   );
@@ -332,6 +341,7 @@ Future<void> _initCartModule() async {
     () => CartNotificationService(
       dio: serviceLocator<ApiService>().dio,
       userSharedPrefs: serviceLocator<UserSharedPrefs>(),
+      scaffoldMessengerKey: globalScaffoldMessengerKey,
     ),
   );
 
@@ -450,9 +460,14 @@ Future<void> _initNotificationModule() async {
     () => NotificationRemoteDataSource(serviceLocator<Dio>()),
   );
 
+  serviceLocator.registerLazySingleton<NotificationLocalDataSource>(
+    () => NotificationLocalDataSourceImpl(),
+  );
+
   serviceLocator.registerLazySingleton<INotificationRepository>(
     () => NotificationRepositoryImpl(
       serviceLocator<INotificationRemoteDataSource>(),
+      serviceLocator<NotificationLocalDataSource>(),
     ),
   );
 
@@ -477,6 +492,10 @@ Future<void> _initNotificationModule() async {
         ClearAllNotificationsUseCase(serviceLocator<INotificationRepository>()),
   );
 
+  serviceLocator.registerLazySingleton<AddNotificationUseCase>(
+    () => AddNotificationUseCase(serviceLocator<INotificationRepository>()),
+  );
+
   // Presentation layer
   serviceLocator.registerFactory<NotificationBloc>(
     () => NotificationBloc(
@@ -488,4 +507,15 @@ Future<void> _initNotificationModule() async {
           serviceLocator<ClearAllNotificationsUseCase>(),
     ),
   );
+}
+
+Future<void> _initSensorAndThemeServices() async {
+  // Register sensor service
+  serviceLocator.registerLazySingleton<SensorService>(() => SensorService());
+
+  // Register theme service
+  serviceLocator.registerLazySingleton<ThemeService>(() => ThemeService());
+
+  // Initialize theme service
+  await serviceLocator<ThemeService>().initialize();
 }

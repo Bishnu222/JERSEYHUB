@@ -75,6 +75,13 @@ class SyncCartEvent extends CartEvent {
   List<Object?> get props => [userId];
 }
 
+class PaymentCompletedEvent extends CartEvent {
+  const PaymentCompletedEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
 // States
 abstract class CartState extends Equatable {
   const CartState();
@@ -89,10 +96,11 @@ class CartLoading extends CartState {}
 
 class CartLoaded extends CartState {
   final CartEntity cart;
-  const CartLoaded({required this.cart});
+  final bool paymentCompleted; // Add field to track payment completion
+  const CartLoaded({required this.cart, this.paymentCompleted = false});
 
   @override
-  List<Object?> get props => [cart];
+  List<Object?> get props => [cart, paymentCompleted];
 }
 
 class CartError extends CartState {
@@ -135,20 +143,32 @@ class CartViewModel extends Bloc<CartEvent, CartState> {
     on<UpdateQuantityEvent>(_onUpdateQuantity);
     on<ClearCartEvent>(_onClearCart);
     on<SyncCartEvent>(_onSyncCart);
+    on<PaymentCompletedEvent>(_onPaymentCompleted);
   }
 
   String _getUserId(String? eventUserId) {
-    return eventUserId ?? _userSharedPrefs.getCurrentUserId() ?? 'unknown_user';
+    final userId = eventUserId ?? _userSharedPrefs.getCurrentUserId();
+    if (userId == null || userId.isEmpty) {
+      throw Exception('User ID is required for cart operations');
+    }
+    return userId;
   }
 
   Future<void> _onLoadCart(LoadCartEvent event, Emitter<CartState> emit) async {
     emit(CartLoading());
+
     final userId = _getUserId(event.userId);
     final result = await _getCartUseCase(GetCartParams(userId: userId));
-    result.fold(
-      (failure) => emit(CartError(message: failure.message)),
-      (cart) => emit(CartLoaded(cart: cart)),
-    );
+
+    result.fold((failure) => emit(CartError(message: failure.message)), (cart) {
+      // Send cart reminder notification if cart has items
+      if (cart.isNotEmpty) {
+        _cartNotificationService.sendCartReminderNotification(
+          itemCount: cart.itemCount,
+        );
+      }
+      emit(CartLoaded(cart: cart));
+    });
   }
 
   Future<void> _onAddToCart(
@@ -260,10 +280,22 @@ class CartViewModel extends Bloc<CartEvent, CartState> {
         quantity: event.quantity,
       ),
     );
-    result.fold(
-      (failure) => emit(CartError(message: failure.message)),
-      (cart) => emit(CartLoaded(cart: cart)),
-    );
+    result.fold((failure) => emit(CartError(message: failure.message)), (cart) {
+      // Find the updated item to get its details for notification
+      final updatedItem = cart.items.firstWhere(
+        (item) => item.id == event.itemId,
+        orElse: () => cart.items.first,
+      );
+
+      // Send notification for quantity update
+      _cartNotificationService.sendCartTotalUpdateNotification(
+        oldTotal: 0, // We don't have the old total easily available
+        newTotal: cart.totalPrice,
+        changeReason: 'Quantity updated for ${updatedItem.product.team}',
+      );
+
+      emit(CartLoaded(cart: cart));
+    });
   }
 
   Future<void> _onClearCart(
@@ -272,10 +304,16 @@ class CartViewModel extends Bloc<CartEvent, CartState> {
   ) async {
     final userId = _getUserId(event.userId);
     final result = await _clearCartUseCase(ClearCartParams(userId: userId));
-    result.fold(
-      (failure) => emit(CartError(message: failure.message)),
-      (cart) => emit(CartLoaded(cart: cart)),
-    );
+    result.fold((failure) => emit(CartError(message: failure.message)), (cart) {
+      // Send notification for cart cleared
+      _cartNotificationService.sendCartTotalUpdateNotification(
+        oldTotal: 0, // We don't have the old total easily available
+        newTotal: cart.totalPrice,
+        changeReason: 'Cart cleared',
+      );
+
+      emit(CartLoaded(cart: cart));
+    });
   }
 
   Future<void> _onSyncCart(SyncCartEvent event, Emitter<CartState> emit) async {
@@ -287,6 +325,34 @@ class CartViewModel extends Bloc<CartEvent, CartState> {
     result.fold(
       (failure) => emit(CartError(message: failure.message)),
       (cart) => emit(CartLoaded(cart: cart)),
+    );
+  }
+
+  Future<void> _onPaymentCompleted(
+    PaymentCompletedEvent event,
+    Emitter<CartState> emit,
+  ) async {
+    print('🛒 CartViewModel: PaymentCompletedEvent received');
+    final userId = _userSharedPrefs.getCurrentUserId();
+    if (userId == null || userId.isEmpty) {
+      print('❌ CartViewModel: User ID not found for payment completion');
+      emit(CartError(message: 'User ID not found for payment completion'));
+      return;
+    }
+
+    print('🛒 CartViewModel: Clearing cart for user: $userId');
+    final result = await _clearCartUseCase(ClearCartParams(userId: userId));
+    result.fold(
+      (failure) {
+        print('❌ CartViewModel: Clear cart failed: ${failure.message}');
+        emit(CartError(message: failure.message));
+      },
+      (cart) {
+        print(
+          '✅ CartViewModel: Cart cleared successfully. Emitting CartLoaded with paymentCompleted: true',
+        );
+        emit(CartLoaded(cart: cart, paymentCompleted: true));
+      },
     );
   }
 }

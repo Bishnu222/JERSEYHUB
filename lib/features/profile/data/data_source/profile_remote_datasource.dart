@@ -4,6 +4,8 @@ import 'package:jerseyhub/core/error/failure.dart';
 import 'package:jerseyhub/core/network/api_service.dart';
 import 'package:jerseyhub/features/profile/data/model/profile_model.dart';
 import 'package:jerseyhub/features/profile/domain/entity/profile_entity.dart';
+import 'package:jerseyhub/app/shared_prefs/user_shared_prefs.dart';
+import 'package:jerseyhub/app/service_locator/service_locator.dart';
 
 abstract class ProfileRemoteDataSource {
   Future<Either<Failure, ProfileModel>> getProfile(String userId);
@@ -87,12 +89,23 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         print(
           'Backend not available or route not found, returning mock profile for testing',
         );
+
+        // Get actual user data from SharedPreferences
+        final userSharedPrefs = serviceLocator<UserSharedPrefs>();
+        final userEmail =
+            userSharedPrefs.getCurrentUserEmail() ?? 'test@example.com';
+        final userId = userSharedPrefs.getCurrentUserId() ?? userIdentifier;
+
+        // Extract username from email (everything before @)
+        final username = userEmail.split('@').first;
+        final capitalizedUsername = username.isNotEmpty
+            ? username[0].toUpperCase() + username.substring(1)
+            : 'User';
+
         final mockProfile = ProfileModel(
-          id: userIdentifier,
-          username: 'Test User',
-          email: userIdentifier.contains('@')
-              ? userIdentifier
-              : 'test@example.com',
+          id: userId,
+          username: capitalizedUsername,
+          email: userEmail,
           address: 'Test Address',
           phoneNumber: '+1234567890',
           profileImage:

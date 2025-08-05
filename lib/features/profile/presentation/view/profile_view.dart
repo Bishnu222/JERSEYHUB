@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jerseyhub/app/service_locator/service_locator.dart';
 import 'package:jerseyhub/app/shared_prefs/user_shared_prefs.dart';
 import 'package:jerseyhub/features/auth/presentation/view/login_view.dart';
@@ -35,6 +34,12 @@ class _ProfileViewState extends State<ProfileView> {
     super.initState();
     // Load saved profile image URL from SharedPreferences
     _loadSavedProfileImage();
+
+    // Debug: Print current user data
+    final userSharedPrefs = serviceLocator<UserSharedPrefs>();
+    userSharedPrefs.printCurrentUserData();
+    print('🔍 ProfileView: Loading profile for user ID: ${widget.userId}');
+
     // Load profile data when view initializes
     context.read<ProfileViewModel>().add(GetProfileEvent(widget.userId));
   }

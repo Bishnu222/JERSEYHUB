@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:jerseyhub/app/service_locator/service_locator.dart';
-import 'package:jerseyhub/app/shared_prefs/user_shared_prefs.dart';
 import 'package:jerseyhub/app/shared_prefs/token_shared_prefs.dart';
 import 'package:jerseyhub/core/network/api_service.dart';
+import 'package:jerseyhub/core/widgets/football_shirts_logo.dart';
 import 'package:jerseyhub/features/auth/domain/use_case/user_login_usecase.dart';
 import 'package:jerseyhub/features/auth/presentation/view/register_view.dart';
 import 'package:jerseyhub/features/auth/presentation/view_model/login_view_model/login_event.dart';
 import 'package:jerseyhub/features/auth/presentation/view_model/login_view_model/login_state.dart';
 import 'package:jerseyhub/features/auth/presentation/view_model/login_view_model/login_view_model.dart';
 import 'package:jerseyhub/features/home/presentation/view/home_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jerseyhub/core/theme/theme_manager.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -202,31 +202,20 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
                                     ),
                                     child: Column(
                                       children: [
-                                        Icon(
-                                          Icons.sports_soccer,
-                                          size: 60,
-                                          color: Colors.white,
+                                        const FootballShirtsLogo(
+                                          size: 180,
+                                          textColor: Colors.white,
+                                          iconColor: Colors.white,
                                         ),
-                                        const SizedBox(height: 10),
-                                        const Text(
-                                          'JERSEY HUB',
-                                          style: TextStyle(
-                                            fontFamily: 'OpenSans Bold',
-                                            color: Colors.white,
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 2,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
+                                        const SizedBox(height: 15),
                                         Text(
                                           'Welcome Back!',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(
-                                              0.8,
+                                            color: _getTextColorForGradient(
+                                              context,
                                             ),
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w300,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ],
@@ -282,12 +271,14 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withOpacity(0.25), // More visible background
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.8), // Very visible border
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -296,20 +287,21 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
       child: TextFormField(
         key: key,
         controller: controller,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Colors.black, // Black text for contrast on white background
           fontSize: 16,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.black.withOpacity(0.6), // Dark grey hint text
             fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
           prefixIcon: Icon(
             icon,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.black.withOpacity(0.7), // Dark grey icon
             size: 24,
           ),
           border: InputBorder.none,
@@ -325,12 +317,14 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
   Widget _buildPasswordField() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withOpacity(0.25), // More visible background
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.8), // Very visible border
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -340,26 +334,27 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
         key: const Key('passwordField'),
         controller: _passwordController,
         obscureText: !_isPasswordVisible,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Colors.black, // Black text for contrast on white background
           fontSize: 16,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
         decoration: InputDecoration(
           hintText: "Enter Password",
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.black.withOpacity(0.6), // Dark grey hint text
             fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
           prefixIcon: Icon(
             Icons.lock_outline,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.black.withOpacity(0.7), // Dark grey icon
             size: 24,
           ),
           suffixIcon: IconButton(
             icon: Icon(
               _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.black.withOpacity(0.7), // Dark grey icon
             ),
             onPressed: () {
               setState(() {
@@ -441,7 +436,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
           Text(
             "Don't have an account?",
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+              color: _getTextColorForGradient(context).withOpacity(0.8),
               fontSize: 16,
             ),
           ),
@@ -456,7 +451,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
             child: Text(
               "Sign Up",
               style: TextStyle(
-                color: Colors.yellow.shade300,
+                color: _getAccentColorForGradient(context),
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 decoration: TextDecoration.underline,
@@ -466,5 +461,26 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+
+  // Helper method to get appropriate text color for gradient background
+  Color _getTextColorForGradient(BuildContext context) {
+    final themeManager = ThemeManager();
+    if (themeManager.isDarkMode) {
+      return Colors.white; // White text for dark mode on gradient
+    } else {
+      return Colors
+          .white; // White text for light mode on gradient (better contrast)
+    }
+  }
+
+  // Helper method to get accent color for gradient background
+  Color _getAccentColorForGradient(BuildContext context) {
+    final themeManager = ThemeManager();
+    if (themeManager.isDarkMode) {
+      return Colors.yellow.shade300; // Yellow accent for dark mode
+    } else {
+      return Colors.yellow.shade300; // Yellow accent for light mode
+    }
   }
 }

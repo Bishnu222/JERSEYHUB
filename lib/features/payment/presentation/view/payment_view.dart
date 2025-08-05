@@ -4,6 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:jerseyhub/features/payment/domain/entity/payment_entity.dart';
 import 'package:jerseyhub/features/payment/presentation/viewmodel/payment_viewmodel.dart';
+import 'package:jerseyhub/features/cart/presentation/viewmodel/cart_viewmodel.dart';
+import 'package:jerseyhub/app/service_locator/service_locator.dart';
+import 'package:jerseyhub/app/shared_prefs/user_shared_prefs.dart';
+import 'package:jerseyhub/features/home/presentation/view/home_page.dart';
+import 'package:jerseyhub/features/home/presentation/viewmodel/homepage_viewmodel.dart';
 
 class PaymentView extends StatefulWidget {
   final String orderId;
@@ -32,11 +37,12 @@ class _PaymentViewState extends State<PaymentView> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         // If user presses back button, return false to indicate payment was not completed
         Navigator.of(context).pop(false);
-        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -301,6 +307,12 @@ class _PaymentViewState extends State<PaymentView> {
   }
 
   void _processCashOnDelivery() {
+    print('💳 PaymentView: Processing Cash on Delivery payment');
+    print('💳 PaymentView: Order ID: ${widget.orderId}');
+    print('💳 PaymentView: Amount: ${widget.amount}');
+    print('💳 PaymentView: Customer: ${widget.customerName}');
+    print('💳 PaymentView: Email: ${widget.customerEmail}');
+
     // Show confirmation dialog for cash on delivery
     _showCashOnDeliveryConfirmation();
   }
@@ -626,15 +638,18 @@ class _PaymentViewState extends State<PaymentView> {
                 ),
                 const SizedBox(height: 24),
 
-                // OK Button
+                // OK Button - Navigate to Home Page
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(
-                        context,
-                      ).pop(true); // Return true to indicate success
+                      Navigator.of(context).pop(
+                        true,
+                      ); // Close dialog (return true to indicate success)
+                      widget.onPaymentSuccess
+                          ?.call(); // Trigger order creation in CheckoutView
+                      _navigateToHomeDirectly(); // Navigate to home after order creation is handled by CheckoutView
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
@@ -645,7 +660,7 @@ class _PaymentViewState extends State<PaymentView> {
                       elevation: 3,
                     ),
                     child: const Text(
-                      'OK',
+                      'Go to Home',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -851,11 +866,11 @@ class _PaymentViewState extends State<PaymentView> {
           actions: [
             ElevatedButton(
               onPressed: () {
-                Navigator.of(
-                  context,
-                ).pop(true); // Return true to indicate payment success
-                // Don't call onPaymentSuccess here - let the user see the payment success first
-                // The order will be created when they navigate back
+                // Close dialog and navigate directly to home
+                Navigator.of(context).pop(); // Close dialog
+                widget.onPaymentSuccess
+                    ?.call(); // Trigger order creation in CheckoutView
+                _navigateToHomeDirectly(); // Navigate to home after order creation is handled by CheckoutView
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -864,11 +879,32 @@ class _PaymentViewState extends State<PaymentView> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('OK'),
+              child: const Text('Go to Home'),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToHomeDirectly() async {
+    // Clear the cart first
+    final userSharedPrefs = serviceLocator<UserSharedPrefs>();
+    final userId = userSharedPrefs.getCurrentUserId();
+    if (userId != null) {
+      final cartViewModel = serviceLocator<CartViewModel>();
+      cartViewModel.add(PaymentCompletedEvent());
+    }
+
+    // Navigate directly to home page by replacing all routes with home page
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => BlocProvider(
+          create: (context) => serviceLocator<HomeViewModel>(),
+          child: const HomePage(),
+        ),
+      ),
+      (route) => false, // Remove all routes
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as socket_io;
 import 'package:jerseyhub/app/constant/backend_config.dart';
 import 'package:jerseyhub/features/notification/data/model/notification_api_model.dart';
 import 'package:jerseyhub/features/notification/domain/entity/notification_entity.dart';
@@ -17,7 +17,7 @@ abstract class INotificationRemoteDataSource {
 
 class NotificationRemoteDataSource implements INotificationRemoteDataSource {
   final Dio _dio;
-  IO.Socket? _socket;
+  socket_io.Socket? _socket;
   final StreamController<NotificationEntity> _notificationController =
       StreamController<NotificationEntity>.broadcast();
 
@@ -26,15 +26,39 @@ class NotificationRemoteDataSource implements INotificationRemoteDataSource {
   @override
   Future<List<NotificationApiModel>> getNotifications(String userId) async {
     try {
+      print(
+        '🔍 NotificationDataSource: Fetching notifications for user: $userId',
+      );
+
+      // Check if backend is disabled
+      if (!BackendConfig.enableBackend) {
+        print('📱 Backend disabled, returning mock notifications');
+        return _getMockNotifications(userId);
+      }
+
       final response = await _dio.get('/notifications/user/$userId');
+
+      print(
+        '🔍 NotificationDataSource: Response status: ${response.statusCode}',
+      );
+      print('🔍 NotificationDataSource: Response data: ${response.data}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
-        return data.map((json) => NotificationApiModel.fromJson(json)).toList();
+        final notifications = data
+            .map((json) => NotificationApiModel.fromJson(json))
+            .toList();
+        print(
+          '🔍 NotificationDataSource: Parsed ${notifications.length} notifications',
+        );
+        return notifications;
       } else {
-        throw Exception('Failed to load notifications');
+        throw Exception(
+          'Failed to load notifications: Status ${response.statusCode}',
+        );
       }
     } catch (e) {
+      print('❌ NotificationDataSource: Error fetching notifications: $e');
       throw Exception('Failed to load notifications: $e');
     }
   }
@@ -87,13 +111,19 @@ class NotificationRemoteDataSource implements INotificationRemoteDataSource {
   @override
   Future<void> connectToSocket(String userId) async {
     try {
+      // Check if backend is disabled
+      if (!BackendConfig.enableBackend) {
+        print('📱 Backend disabled, skipping socket connection');
+        return;
+      }
+
       // Disconnect existing socket if any
       await disconnectFromSocket();
 
       // Create new socket connection
-      _socket = IO.io(
+      _socket = socket_io.io(
         BackendConfig.serverAddress,
-        IO.OptionBuilder()
+        socket_io.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()
             .build(),
@@ -145,6 +175,50 @@ class NotificationRemoteDataSource implements INotificationRemoteDataSource {
   @override
   Stream<NotificationEntity> get notificationStream =>
       _notificationController.stream;
+
+  // Mock notifications for testing when backend is disabled
+  List<NotificationApiModel> _getMockNotifications(String userId) {
+    return [
+      NotificationApiModel(
+        id: 'mock_notification_1',
+        userId: userId,
+        message:
+            'Welcome to Jersey Hub! Thank you for joining our platform. Start exploring our amazing jerseys!',
+        read: false,
+        type: 'welcome',
+        createdAt: DateTime.now()
+            .subtract(Duration(hours: 2))
+            .toIso8601String(),
+        updatedAt: DateTime.now()
+            .subtract(Duration(hours: 2))
+            .toIso8601String(),
+      ),
+      NotificationApiModel(
+        id: 'mock_notification_2',
+        userId: userId,
+        message:
+            'New Jersey Available! Check out our latest collection of premium football jerseys!',
+        read: true,
+        type: 'product',
+        createdAt: DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
+        updatedAt: DateTime.now().subtract(Duration(days: 1)).toIso8601String(),
+      ),
+      NotificationApiModel(
+        id: 'mock_notification_3',
+        userId: userId,
+        message:
+            'Order Update: Your order #12345 has been shipped and is on its way!',
+        read: false,
+        type: 'order',
+        createdAt: DateTime.now()
+            .subtract(Duration(hours: 6))
+            .toIso8601String(),
+        updatedAt: DateTime.now()
+            .subtract(Duration(hours: 6))
+            .toIso8601String(),
+      ),
+    ];
+  }
 
   void dispose() {
     disconnectFromSocket();

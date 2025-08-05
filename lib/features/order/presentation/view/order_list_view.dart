@@ -14,28 +14,63 @@ class OrderListView extends StatefulWidget {
   State<OrderListView> createState() => _OrderListViewState();
 }
 
-class _OrderListViewState extends State<OrderListView> {
+class _OrderListViewState extends State<OrderListView>
+    with WidgetsBindingObserver {
   late final UserSharedPrefs _userSharedPrefs;
 
   @override
   void initState() {
     super.initState();
     _userSharedPrefs = serviceLocator<UserSharedPrefs>();
+    WidgetsBinding.instance.addObserver(this);
+    // Do not call _loadOrders here if it uses ScaffoldMessenger
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _loadOrders();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      print('🔄 App resumed, refreshing orders');
+      _loadOrders();
+    }
   }
 
   void _loadOrders() {
     final userId = _userSharedPrefs.getCurrentUserId();
     print('🔍 OrderListView: Loading orders for user ID: $userId');
 
-    if (userId != null) {
+    if (userId != null && userId.isNotEmpty && userId != 'unknown_user') {
       print(
-        '🔍 OrderListView: Dispatching LoadAllOrdersEvent with userId: $userId',
+        '🔍 OrderListView: Dispatching LoadAllOrdersEvent for authenticated user',
       );
-      context.read<OrderViewModel>().add(LoadAllOrdersEvent(userId: userId));
+      try {
+        context.read<OrderViewModel>().add(const LoadAllOrdersEvent());
+      } catch (e) {
+        print('❌ OrderListView: Error dispatching LoadAllOrdersEvent: $e');
+      }
     } else {
-      print('❌ OrderListView: No user ID found!');
-      context.read<OrderViewModel>().add(LoadAllOrdersEvent());
+      print('❌ OrderListView: No valid user ID found!');
+      // Show a user-friendly message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to view your orders'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      });
     }
   }
 
@@ -48,15 +83,23 @@ class _OrderListViewState extends State<OrderListView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Theme.of(context).primaryColor,
-            child: const Row(
+            child: Row(
               children: [
-                Text(
+                const Text(
                   'My Orders',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    print('🔄 Manual refresh triggered');
+                    _loadOrders();
+                  },
+                  icon: const Icon(Icons.refresh, color: Colors.white),
                 ),
               ],
             ),
@@ -69,11 +112,11 @@ class _OrderListViewState extends State<OrderListView> {
                   print(
                     '🔍 OrderListView: Orders loaded successfully. Count: ${state.orders.length}',
                   );
-                  state.orders.forEach((order) {
+                  for (var order in state.orders) {
                     print(
                       '🔍 OrderListView: Order ID: ${order.id}, Status: ${order.status}, Total: ${order.totalAmount}',
                     );
-                  });
+                  }
                 } else if (state is OrderError) {
                   print(
                     '❌ OrderListView: Error loading orders: ${state.message}',
@@ -109,10 +152,28 @@ class _OrderListViewState extends State<OrderListView> {
   }
 
   Widget _buildEmptyOrders() {
+    final userId = _userSharedPrefs.getCurrentUserId();
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Debug indicator
+          Container(
+            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue, width: 2),
+            ),
+            child: Text(
+              'DEBUG: User ID = $userId',
+              style: TextStyle(
+                color: Colors.blue[800],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
@@ -186,7 +247,12 @@ class _OrderListViewState extends State<OrderListView> {
           const SizedBox(height: 8),
           Text(
             message,
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            style: TextStyle(
+              fontSize: 16,
+              color:
+                  Theme.of(context).textTheme.bodyLarge?.color ??
+                  Colors.grey[600],
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),

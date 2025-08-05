@@ -12,4 +12,9 @@ abstract class INotificationRepository {
   Future<Either<Failure, void>> connectToSocket(String userId);
   Future<Either<Failure, void>> disconnectFromSocket();
   Stream<NotificationEntity> get notificationStream;
+
+  // Add method to store notifications locally
+  Future<Either<Failure, NotificationEntity>> addNotification(
+    NotificationEntity notification,
+  );
 }

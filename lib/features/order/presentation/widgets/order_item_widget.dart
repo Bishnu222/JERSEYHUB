@@ -43,24 +43,38 @@ class OrderItemWidget extends StatelessWidget {
   }
 
   Widget _getProductImage() {
+    print('🖼️ OrderItemWidget: Loading image for ${item.product.team}');
+    print('🖼️ OrderItemWidget: Image path: ${item.product.productImage}');
+
     if (item.product.productImage.isEmpty) {
+      print('🖼️ OrderItemWidget: Empty image path, using placeholder');
       return _buildPlaceholderImage();
     }
 
     // Handle asset images
     if (item.product.productImage.startsWith('assets/')) {
+      print(
+        '🖼️ OrderItemWidget: Loading asset image: ${item.product.productImage}',
+      );
       return Image.asset(
         item.product.productImage,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
+          print('❌ OrderItemWidget: Asset image error: $error');
           return _buildPlaceholderImage();
         },
       );
     }
 
-    // Handle network images
+    // Handle network images with cache busting
+    final imageUrl = item.product.productImage.contains('?')
+        ? item.product.productImage
+        : '${item.product.productImage}?t=${DateTime.now().millisecondsSinceEpoch}';
+
+    print('🖼️ OrderItemWidget: Loading network image: $imageUrl');
+
     return Image.network(
-      item.product.productImage,
+      imageUrl,
       fit: BoxFit.cover,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
@@ -78,6 +92,7 @@ class OrderItemWidget extends StatelessWidget {
         );
       },
       errorBuilder: (context, error, stackTrace) {
+        print('❌ OrderItemWidget: Network image error: $error');
         return _buildPlaceholderImage();
       },
     );

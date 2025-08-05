@@ -23,8 +23,6 @@ class _SplashScreenViewState extends State<SplashScreenView>
   late AnimationController _particleController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _rotateAnimation;
-  late Animation<double> _particleAnimation;
 
   @override
   void initState() {
@@ -58,14 +56,6 @@ class _SplashScreenViewState extends State<SplashScreenView>
 
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
-    );
-
-    _rotateAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _rotateController, curve: Curves.easeInOut),
-    );
-
-    _particleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _particleController, curve: Curves.easeInOut),
     );
 
     // Start animations

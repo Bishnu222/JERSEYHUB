@@ -4,7 +4,7 @@ import 'package:jerseyhub/core/error/failure.dart';
 import 'package:jerseyhub/features/order/domain/entity/order_entity.dart';
 
 abstract class OrderRemoteDataSource {
-  Future<Either<Failure, List<OrderEntity>>> getAllOrders(String userId);
+  Future<Either<Failure, List<OrderEntity>>> getAllOrders();
   Future<Either<Failure, OrderEntity>> getOrderById(String orderId);
   Future<Either<Failure, OrderEntity>> createOrder(OrderEntity order);
   Future<Either<Failure, OrderEntity>> updateOrderStatus(
@@ -20,12 +20,15 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   OrderRemoteDataSourceImpl(this._dio);
 
   @override
-  Future<Either<Failure, List<OrderEntity>>> getAllOrders(String userId) async {
+  Future<Either<Failure, List<OrderEntity>>> getAllOrders() async {
     try {
-      print('🔗 OrderRemoteDataSource: Fetching orders for userId: $userId');
-      print('🔗 OrderRemoteDataSource: API URL: /orders/user/$userId');
+      print('🔗 OrderRemoteDataSource: Fetching orders for authenticated user');
+      print('🔗 OrderRemoteDataSource: API URL: /orders/user/authenticated');
+      print(
+        '🔗 OrderRemoteDataSource: Full URL: ${_dio.options.baseUrl}/orders/user/authenticated',
+      );
 
-      final response = await _dio.get('/orders/user/$userId');
+      final response = await _dio.get('/orders/user/authenticated');
 
       print(
         '✅ OrderRemoteDataSource: API response status: ${response.statusCode}',
@@ -34,9 +37,17 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
 
       if (response.statusCode == 200) {
         final List<dynamic> ordersData = response.data;
-        final orders = ordersData
-            .map((orderData) => OrderEntity.fromJson(orderData))
-            .toList();
+        print('📄 OrderRemoteDataSource: Raw orders data: $ordersData');
+
+        final orders = ordersData.map((orderData) {
+          try {
+            print('🔍 OrderRemoteDataSource: Parsing order: $orderData');
+            return OrderEntity.fromJson(orderData);
+          } catch (e) {
+            print('💥 OrderRemoteDataSource: Error parsing order: $e');
+            rethrow;
+          }
+        }).toList();
         print(
           '🎉 OrderRemoteDataSource: Successfully parsed ${orders.length} orders',
         );
@@ -77,16 +88,41 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   @override
   Future<Either<Failure, OrderEntity>> createOrder(OrderEntity order) async {
     try {
-      print('🔗 Creating order in backend...');
-      print('📦 Order data: ${order.toJson()}');
+      print('🔗 Creating order in backend using /orders/from-cart endpoint...');
 
-      final response = await _dio.post('/orders', data: order.toJson());
+      // Prepare data for the /orders/from-cart endpoint
+      final orderData = {
+        'cartItems': order.items
+            .map(
+              (item) => {
+                'name': item.product.team,
+                'quantity': item.quantity,
+                'price': item.product.price,
+                'productImage': item.product.productImage,
+              },
+            )
+            .toList(),
+        'customerInfo': {
+          'name': order.customerName,
+          'email': order.customerEmail,
+          'phone': order.customerPhone,
+          'address': order.shippingAddress,
+        },
+        'paymentMethod': 'esewa', // Default payment method
+      };
+
+      print('📦 Order data for /orders/from-cart: $orderData');
+
+      final response = await _dio.post('/orders/from-cart', data: orderData);
 
       print('✅ Backend response status: ${response.statusCode}');
       print('📄 Backend response data: ${response.data}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final orderData = response.data;
+        final responseData = response.data;
+
+        // Handle the response structure from /orders/from-cart
+        final orderData = responseData['order'] ?? responseData;
         final createdOrder = OrderEntity.fromJson(orderData);
         print('🎉 Order created successfully in backend: ${createdOrder.id}');
         return Right(createdOrder);

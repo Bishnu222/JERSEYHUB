@@ -112,10 +112,18 @@ class OrderEntity extends Equatable {
 
   // Create from JSON from backend API
   factory OrderEntity.fromJson(Map<String, dynamic> json) {
+    print('📦 OrderEntity: Parsing order from JSON: ${json['_id']}');
+
     // Convert backend products to cart items
     List<CartItemEntity> cartItems = [];
     if (json['products'] != null) {
+      print(
+        '📦 OrderEntity: Found ${(json['products'] as List).length} products',
+      );
       cartItems = (json['products'] as List).map((productJson) {
+        print('📦 OrderEntity: Parsing product: ${productJson['name']}');
+        print('📦 OrderEntity: Product image: ${productJson['productImage']}');
+
         // Create a minimal ProductEntity for the cart item
         final product = ProductEntity(
           id: productJson['_id'] ?? '',
@@ -175,13 +183,15 @@ class OrderEntity extends Equatable {
       customerPhone: customerPhone,
       shippingAddress: shippingAddress,
       trackingNumber: json['trackingNumber'],
-      createdAt: json['date'] != null
-          ? DateTime.parse(json['date'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
           : (json['date'] != null
                 ? DateTime.parse(json['date'])
+                : DateTime.now()),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : (json['createdAt'] != null
+                ? DateTime.parse(json['createdAt'])
                 : DateTime.now()),
     );
   }

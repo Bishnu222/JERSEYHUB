@@ -28,21 +28,33 @@ class ProfileViewModel extends Bloc<ProfileEvent, ProfileState> {
     GetProfileEvent event,
     Emitter<ProfileState> emit,
   ) async {
-    print('🔍 ProfileViewModel: Getting profile for user: ${event.userId}');
     emit(ProfileLoading());
 
-    final result = await getProfileUseCase(event.userId);
+    print('🔍 ProfileViewModel: Getting profile for user ID: ${event.userId}');
 
-    result.fold(
-      (failure) {
-        print('❌ ProfileViewModel: Failed to get profile - ${failure.message}');
-        emit(ProfileError(failure.message));
-      },
-      (profile) {
-        print('✅ ProfileViewModel: Profile loaded successfully');
-        emit(ProfileLoaded(profile));
-      },
-    );
+    try {
+      final result = await getProfileUseCase(event.userId);
+
+      result.fold(
+        (failure) {
+          print(
+            '❌ ProfileViewModel: Failed to get profile - ${failure.message}',
+          );
+          emit(ProfileError(failure.message));
+        },
+        (profile) {
+          print(
+            '✅ ProfileViewModel: Successfully loaded profile for user: ${profile.username}',
+          );
+          print('🔍 ProfileViewModel: Profile user ID: ${profile.id}');
+          print('🔍 ProfileViewModel: Requested user ID: ${event.userId}');
+          emit(ProfileLoaded(profile));
+        },
+      );
+    } catch (e) {
+      print('❌ ProfileViewModel: Exception getting profile - $e');
+      emit(ProfileError(e.toString()));
+    }
   }
 
   Future<void> _onUpdateProfile(

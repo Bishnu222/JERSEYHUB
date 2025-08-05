@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:jerseyhub/core/error/failure.dart';
 import 'package:jerseyhub/features/notification/domain/entity/notification_entity.dart';
 import 'package:jerseyhub/features/notification/domain/repository/notification_repository.dart';
 import 'package:jerseyhub/features/notification/domain/use_case/get_notifications_usecase.dart';
@@ -64,6 +63,15 @@ class ConnectToSocket extends NotificationEvent {
 
 class DisconnectFromSocket extends NotificationEvent {
   const DisconnectFromSocket();
+}
+
+class RefreshNotifications extends NotificationEvent {
+  final String userId;
+
+  const RefreshNotifications(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 class NewNotificationReceived extends NotificationEvent {
@@ -141,6 +149,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     on<ConnectToSocket>(_onConnectToSocket);
     on<DisconnectFromSocket>(_onDisconnectFromSocket);
     on<NewNotificationReceived>(_onNewNotificationReceived);
+    on<RefreshNotifications>(_onRefreshNotifications);
   }
 
   Future<void> _onLoadNotifications(
@@ -155,6 +164,32 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       notifications,
     ) {
       final unreadCount = notifications.where((n) => !n.read).length;
+      emit(
+        NotificationsLoaded(
+          notifications: notifications,
+          unreadCount: unreadCount,
+        ),
+      );
+    });
+  }
+
+  Future<void> _onRefreshNotifications(
+    RefreshNotifications event,
+    Emitter<NotificationState> emit,
+  ) async {
+    print(
+      '🔔 NotificationBloc: Refreshing notifications for user: ${event.userId}',
+    );
+
+    final result = await _getNotificationsUseCase(event.userId);
+
+    result.fold((failure) => emit(NotificationError(failure.message)), (
+      notifications,
+    ) {
+      final unreadCount = notifications.where((n) => !n.read).length;
+      print(
+        '🔔 NotificationBloc: Refreshed ${notifications.length} notifications, $unreadCount unread',
+      );
       emit(
         NotificationsLoaded(
           notifications: notifications,

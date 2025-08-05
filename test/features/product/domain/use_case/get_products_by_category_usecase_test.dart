@@ -24,7 +24,7 @@ void main() {
       price: 2500.0,
       quantity: 25,
       categoryId: '1',
-      productImage: 'assets/images/Manchester United.png',
+      productImage: 'assets/images/Manchester_United.png',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     ),

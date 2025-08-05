@@ -76,10 +76,8 @@ class OrderRepositoryImpl implements OrderRepository {
 
   // Remote operations
   @override
-  Future<Either<Failure, List<OrderEntity>>> getAllRemoteOrders(
-    String userId,
-  ) async {
-    return await _remoteDataSource.getAllOrders(userId);
+  Future<Either<Failure, List<OrderEntity>>> getAllRemoteOrders() async {
+    return await _remoteDataSource.getAllOrders();
   }
 
   @override
@@ -111,11 +109,11 @@ class OrderRepositoryImpl implements OrderRepository {
 
   // Hybrid operations (try remote first, fallback to local)
   @override
-  Future<Either<Failure, List<OrderEntity>>> getAllOrders(String userId) async {
-    print('🔍 OrderRepositoryImpl: Getting orders for userId: $userId');
+  Future<Either<Failure, List<OrderEntity>>> getAllOrders() async {
+    print('🔍 OrderRepositoryImpl: Getting orders for authenticated user');
 
     // Try remote first, fallback to local
-    final remoteResult = await _remoteDataSource.getAllOrders(userId);
+    final remoteResult = await _remoteDataSource.getAllOrders();
 
     return remoteResult.fold(
       (failure) {
@@ -191,5 +189,17 @@ class OrderRepositoryImpl implements OrderRepository {
       // If remote fails, return local result
       return localResult;
     }, (_) => const Right(null));
+  }
+
+  @override
+  Future<Either<Failure, void>> clearAllLocalOrders() async {
+    try {
+      await _localDataSource.clearAllOrders();
+      print('✅ OrderRepositoryImpl: All local orders cleared');
+      return const Right(null);
+    } catch (e) {
+      print('❌ OrderRepositoryImpl: Failed to clear local orders: $e');
+      return Left(SharedPreferencesFailure(message: e.toString()));
+    }
   }
 }
